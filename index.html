@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Encomendas de Natal 2025</title>
+<style>
+  body { font-family: Arial, sans-serif; background:#fff8f3; color:#333; margin:20px; }
+  h1,h2 { text-align:center; color:#b33c00; }
+  form, table { margin:20px auto; width:90%; max-width:850px; }
+  input, select, button { padding:8px; margin:5px; border-radius:5px; border:1px solid #ccc; }
+  table { width:100%; border-collapse:collapse; margin-top:15px; }
+  th, td { border:1px solid #ccc; padding:8px; text-align:center; }
+  th { background:#ffe4cc; }
+  .print-btn { background:#d2691e; color:#fff; border:none; cursor:pointer; }
+  .print-btn:hover { background:#b35614; }
+  #outroProduto { display:none; }
+  .btn-edit { background:#228b22; color:white; border:none; padding:5px 10px; border-radius:4px; cursor:pointer; }
+  .btn-del { background:#b22222; color:white; border:none; padding:5px 10px; border-radius:4px; cursor:pointer; }
+  #log { text-align:center; margin-top:10px; font-weight:bold; }
+  #log.ok { color:green; } #log.err { color:#c00; }
+</style>
+</head>
+<body>
+<h1>🎁 Encomendas de Natal 2025 🎄</h1>
+
+<form id="clienteForm">
+  <input id="nome" type="text" placeholder="Nome do cliente" required>
+  <label>Dia de Retirada:</label>
+  <input id="data" type="date" min="2025-11-01" max="2025-12-31" required>
+
+  <label for="hora">Hora de Retirada:</label>
+  <select id="hora" required>
+    <option value="">Selecione o horário</option>
+    <option>09h30</option><option>10h00</option>
+    <option>10h30</option><option>11h00</option><option>11h30</option>
+    <option>12h00</option><option>12h30</option><option>13h00</option>
+    <option>13h30</option><option>14h00</option><option>14h30</option>
+    <option>15h00</option><option>15h30</option><option>16h00</option>
+    <option>16h30</option><option>17h00</option><option>17h30</option>
+    <option>18h00</option><option>18h30</option>
+  </select>
+
+  <input id="celular" type="text" placeholder="4 últimos números do celular" maxlength="4" required>
+  <input id="valorPagoPedido" type="number" placeholder="Valor Pago (R$)" step="0.01">
+</form>
+
+<h2>Adicionar Produtos</h2>
+<form id="produtoForm">
+  <select id="produto" required>
+    <option value="">Selecione o produto</option>
+    <option>Chocotone Tradicional</option>
+    <option>Chocotone de Pistache</option>
+    <option>Chocotone de Ganache</option>
+    <option>Chocotone Dois Amores</option>
+    <option>Chocotone de Nutella Crocante</option>
+    <option>Pavlova</option>
+    <option value="outro">Outro</option>
+  </select>
+  <input id="outroProduto" type="text" placeholder="Digite o nome do produto">
+  <input id="quantidade" type="number" placeholder="Qtd" min="1" required>
+  <select id="pagamento" required>
+    <option value="">Tipo de pagamento</option>
+    <option>Pix</option><option>Cartão</option><option>Dinheiro</option>
+  </select>
+  <button id="addBtn" type="button">Adicionar ao Carrinho</button>
+</form>
+
+<table id="carrinhoTable">
+  <thead><tr><th>Produto</th><th>Qtd</th><th>Pagamento</th><th>Ação</th></tr></thead>
+  <tbody></tbody>
+</table>
+
+<div style="text-align:center; margin-top:10px;">
+  <button id="finalizarBtn" type="button" class="print-btn"> Finalizar Pedido</button>
+</div>
+<div id="log"></div>
+
+<hr>
+
+<h2>📅 Relatório do dia</h2>
+<div style="text-align:center;">
+  <input id="filtroData" type="date" min="2025-11-01" max="2025-12-31">
+  <button id="filtrarBtn" type="button">Filtrar</button>
+  <button id="imprimirBtn" type="button" class="print-btn"> Imprimir Relatório</button>
+</div>
+
+<table id="tabela">
+  <thead>
+    <tr>
+      <th>Nome</th><th>Data Retirada</th><th>Hora</th><th>Produtos</th>
+      <th>Total Qtd</th><th>Valor Pago (R$)</th><th>Pagamento</th><th>Celular</th>
+    </tr>
+  </thead>
+  <tbody></tbody>
+</table>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getFirestore, collection, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+  const firebaseConfig = {
+      apiKey: "AIzaSyD--EURv-8FVYXXZUlAWq5mDCS-5Fn0W6k",
+  authDomain: "kantinenatal.firebaseapp.com",
+  projectId: "kantinenatal",
+  storageBucket: "kantinenatal.firebasestorage.app",
+  messagingSenderId: "70810843695",
+  appId: "1:70810843695:web:b811a828b67efcb82ca4da",
+  measurementId: "G-NSZG56D460"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+
+
+  let encomendas = [];
+  let carrinho = [];
+  const tabelaBody = document.querySelector('#tabela tbody');
+  const carrinhoBody = document.querySelector('#carrinhoTable tbody');
+  const logDiv = document.getElementById('log');
+  const getEl = id => document.getElementById(id);
+
+  const log = (msg, ok=true)=>{
+    logDiv.className = ok ? 'ok' : 'err';
+    logDiv.textContent = msg;
+    setTimeout(()=>logDiv.textContent='',2500);
+  };
+
+  const renderTabela = ()=>{
+    tabelaBody.innerHTML = '';
+    encomendas.forEach((e)=>{
+      if(!e || !Array.isArray(e.produtos)) return;
+      const produtosTexto = e.produtos.map(p => `${p.produto} (${p.quantidade})`).join(', ');
+      const totalQtd = e.produtos.reduce((acc,p)=>acc+p.quantidade,0);
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${e.nome}</td>
+        <td>${e.data}</td>
+        <td>${e.hora}</td>
+        <td>${produtosTexto}</td>
+        <td><b>${totalQtd}</b></td>
+        <td>R$ ${Number(e.valorPagoPedido||0).toFixed(2).replace('.',',')}</td>
+        <td>${e.produtos[0]?.pagamento || ''}</td>
+        <td>${e.celular}</td>`;
+      tabelaBody.appendChild(tr);
+    });
+  };
+
+  const renderCarrinho = ()=>{
+    carrinhoBody.innerHTML = '';
+    if(carrinho.length===0){
+      carrinhoBody.innerHTML = `<tr><td colspan="4" style="color:#999;">Nenhum produto adicionado</td></tr>`;
+      return;
+    }
+    carrinho.forEach((p,i)=>{
+      carrinhoBody.innerHTML += `
+        <tr><td>${p.produto}</td><td>${p.quantidade}</td>
+        <td>${p.pagamento}</td>
+        <td><button type="button" data-i="${i}">🗑️</button></td></tr>`;
+    });
+  };
+
+  getEl('produto').addEventListener('change',()=> getEl('outroProduto').style.display = getEl('produto').value==='outro'?'inline-block':'none');
+
+  getEl('addBtn').addEventListener('click',()=>{
+    const nomeProduto = getEl('produto').value==='outro' ? getEl('outroProduto').value.trim() : getEl('produto').value;
+    const qtd = parseInt(getEl('quantidade').value);
+    const pag = getEl('pagamento').value;
+    if(!nomeProduto || !qtd || !pag) return log('Tem que preencher tudo.',false);
+    carrinho.push({produto:nomeProduto,quantidade:qtd,pagamento:pag});
+    renderCarrinho();
+    getEl('produtoForm').reset(); getEl('outroProduto').style.display='none';
+  });
+
+  carrinhoBody.addEventListener('click',e=>{
+    const i=e.target?.dataset?.i;
+    if(i!==undefined){ carrinho.splice(i,1); renderCarrinho(); }
+  });
+
+  getEl('finalizarBtn').addEventListener('click',async ()=>{
+    const nome = getEl('nome').value.trim();
+    const data = getEl('data').value;
+    const hora = getEl('hora').value;
+    const cel = getEl('celular').value.trim();
+    const valorPagoPedido = parseFloat(getEl('valorPagoPedido').value)||0;
+    if(!nome||!data||!hora||!cel||carrinho.length===0) return log('Preencha tudo e adicione produtos.',false);
+    const pedido={nome,data,hora,celular:cel,valorPagoPedido,produtos:[...carrinho]};
+
+    try {
+      await addDoc(collection(db, "pedidos"), pedido);
+      log("salvou no firebase");
+      carrinho=[]; renderCarrinho(); getEl('clienteForm').reset();
+      carregarPedidos();
+    } catch (err) {
+      console.error(err);
+      log("nao salvou no firebase", false);
+    }
+  });
+
+  
+  async function carregarPedidos() {
+    const querySnapshot = await getDocs(collection(db, "pedidos"));
+    encomendas = querySnapshot.docs.map(doc => doc.data());
+    renderTabela();
+  }
+
+  carregarPedidos();
+  renderCarrinho();
+</script>
+</body>
+</html>
