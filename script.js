@@ -1,0 +1,242 @@
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js"
+import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, updateDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js"
+
+const firebaseConfig = {
+  apiKey: "AIzaSyD--EURv-8FVYXXZUlAWq5mDCS-5Fn0W6k",
+  authDomain: "kantinenatal.firebaseapp.com",
+  projectId: "kantinenatal",
+  storageBucket: "kantinenatal.firebasestorage.app",
+  messagingSenderId: "70810843695",
+  appId: "1:70810843695:web:b811a828b67efcb82ca4da",
+  measurementId: "G-NSZG56D460"
+}
+
+const app = initializeApp(firebaseConfig)
+const db = getFirestore(app)
+
+window.addEventListener("DOMContentLoaded", () => {
+  let encomendas = []
+  let carrinho = []
+  const tabelaBody = document.querySelector('#tabela tbody')
+  const carrinhoBody = document.querySelector('#carrinhoTable tbody')
+  const logDiv = document.getElementById('log')
+  const entreguesContainer = document.getElementById("entreguesContainer")
+  const tabelaEntreguesBody = document.querySelector("#tabelaEntregues tbody")
+  const getEl = id => document.getElementById(id)
+
+  const log = (msg, ok = true) => {
+    logDiv.className = ok ? 'ok' : 'err'
+    logDiv.textContent = msg
+    setTimeout(() => logDiv.textContent = '', 2500)
+  }
+
+  function renderTabela() {
+    tabelaBody.innerHTML = ''
+    encomendas.filter(e => !e.entregue).forEach(e => {
+      const produtos = e.produtos.map(p => `${p.produto} (${p.quantidade})`).join(', ')
+      const total = e.produtos.reduce((a, p) => a + p.quantidade, 0)
+      const tr = document.createElement('tr')
+      tr.innerHTML = `
+        <td>${e.nome}</td>
+        <td>${e.data}</td>
+        <td>${e.hora}</td>
+        <td>${e.retirada}</td>
+        <td>${produtos}</td>
+        <td><b>${total}</b></td>
+        <td>${e.celular}</td>
+        <td>
+          <button class="btn-edit" data-id="${e.id}">✏️</button>
+          <button class="btn-del" data-id="${e.id}">🗑️</button>
+          <button class="btn-ok" data-id="${e.id}" style="background:#228b22;color:#fff;">✅</button>
+        </td>`
+      tabelaBody.appendChild(tr)
+    })
+  }
+
+  function renderEntregues() {
+    tabelaEntreguesBody.innerHTML = ''
+    const grupos = {}
+    encomendas.filter(e => e.entregue).forEach(e => {
+      if (!grupos[e.data]) grupos[e.data] = []
+      grupos[e.data].push(e)
+    })
+    for (const data in grupos) {
+      const linha = document.createElement('tr')
+      linha.innerHTML = `<td colspan="7" style="background:#ffe4cc;font-weight:bold;">📅 ${data}</td>`
+      tabelaEntreguesBody.appendChild(linha)
+      grupos[data].forEach(e => {
+        const produtos = e.produtos.map(p => `${p.produto} (${p.quantidade})`).join(', ')
+        const total = e.produtos.reduce((a, p) => a + p.quantidade, 0)
+        const tr = document.createElement('tr')
+        tr.innerHTML = `
+          <td>${e.data}</td>
+          <td>${e.nome}</td>
+          <td>${e.hora}</td>
+          <td>${e.retirada}</td>
+          <td>${produtos}</td>
+          <td><b>${total}</b></td>
+          <td>${e.celular}</td>`
+        tabelaEntreguesBody.appendChild(tr)
+      })
+    }
+  }
+
+  function renderCarrinho() {
+    carrinhoBody.innerHTML = ''
+    if (carrinho.length === 0) {
+      carrinhoBody.innerHTML = `<tr><td colspan="3" style="color:#999;">Nenhum produto adicionado</td></tr>`
+      return
+    }
+    carrinho.forEach((p, i) => {
+      carrinhoBody.innerHTML += `
+        <tr><td>${p.produto}</td><td>${p.quantidade}</td>
+        <td><button type="button" data-i="${i}">🗑️</button></td></tr>`
+    })
+  }
+
+  carrinhoBody.addEventListener('click', e => {
+    const i = e.target?.dataset?.i
+    if (i === undefined) return
+    carrinho.splice(Number(i), 1)
+    renderCarrinho()
+  })
+
+  getEl('produto').addEventListener('change', () => {
+    getEl('outroProduto').style.display = getEl('produto').value === 'outro' ? 'inline-block' : 'none'
+  })
+
+  getEl('addBtn').addEventListener('click', () => {
+    const produto = getEl('produto').value === 'outro' ? getEl('outroProduto').value.trim() : getEl('produto').value
+    const qtd = parseInt(getEl('quantidade').value)
+    if (!produto || !qtd || qtd <= 0) return log('Preencha produto e quantidade.', false)
+    carrinho.push({ produto, quantidade: qtd })
+    renderCarrinho()
+    getEl('produtoForm').reset()
+    getEl('outroProduto').style.display = 'none'
+  })
+
+  getEl('finalizarBtn').addEventListener('click', async () => {
+    const nome = getEl('nome').value.trim()
+    const data = getEl('data').value
+    const hora = getEl('hora').value
+    const retirada = getEl('retirada').value
+    const celular = getEl('celular').value.trim()
+    if (!nome || !data || !hora || !retirada || !celular || carrinho.length === 0)
+      return log('Preencha tudo.', false)
+
+    const pedido = { nome, data, hora, retirada, celular, produtos: [...carrinho], entregue: false }
+    await addDoc(collection(db, "pedidos"), pedido)
+    carrinho = []
+    renderCarrinho()
+    getEl('clienteForm').reset()
+    carregarPedidos()
+    log('Pedido salvo!')
+  })
+
+  tabelaBody.addEventListener('click', async e => {
+    const id = e.target.dataset.id
+    if (!id) return
+
+    if (e.target.classList.contains('btn-del')) {
+      if (!confirm('Excluir este pedido?')) return
+      await deleteDoc(doc(db, "pedidos", id))
+      log('Pedido excluído.')
+      carregarPedidos()
+      return
+    }
+
+    if (e.target.classList.contains('btn-edit')) {
+      const ped = encomendas.find(p => p.id === id)
+      if (!ped) return
+      getEl('nome').value = ped.nome
+      getEl('data').value = ped.data
+      getEl('hora').value = ped.hora
+      getEl('retirada').value = ped.retirada
+      getEl('celular').value = ped.celular
+      carrinho = [...ped.produtos]
+      renderCarrinho()
+      await deleteDoc(doc(db, "pedidos", id))
+      log('Edite e finalize para salvar.')
+      return
+    }
+
+    if (e.target.classList.contains('btn-ok')) {
+      const ref = doc(db, "pedidos", id)
+      await updateDoc(ref, { entregue: true })
+      const docAtualizado = await getDoc(ref)
+      const atualizado = { id: ref.id, ...docAtualizado.data() }
+      encomendas = encomendas.map(p => p.id === id ? atualizado : p)
+      renderTabela()
+      renderEntregues()
+      log('Marcado como entregue!')
+    }
+  })
+
+  document.getElementById('toggleEntregues').addEventListener('click', () => {
+    const aberto = entreguesContainer.style.display === 'block'
+    entreguesContainer.style.display = aberto ? 'none' : 'block'
+    document.getElementById('toggleEntregues').textContent = aberto
+      ? '📦 Encomendas Entregues ⬇️'
+      : '📦 Encomendas Entregues ⬆️'
+  })
+
+  function buildResumoDoDia(dataISO) {
+    const mapa = {}
+    encomendas
+      .filter(e => e?.data === dataISO && !e.entregue && Array.isArray(e.produtos))
+      .forEach(e => {
+        const hora = e.hora
+        const retirada = e.retirada
+        e.produtos.forEach(p => {
+          const chave = `${retirada}|${hora}|${p.produto}`
+          if (!mapa[chave]) mapa[chave] = { retirada, hora, produto: p.produto, quantidade: 0 }
+          mapa[chave].quantidade += Number(p.quantidade)
+        })
+      })
+    const grupos = {}
+    Object.values(mapa).forEach(i => {
+      if (!grupos[i.retirada]) grupos[i.retirada] = []
+      grupos[i.retirada].push(i)
+    })
+    for (const k in grupos)
+      grupos[k].sort((a, b) => a.hora.localeCompare(b.hora))
+    return grupos
+  }
+
+  getEl('filtrarBtn').addEventListener('click', () => {
+    const d = getEl('filtroData').value
+    if (!d) return log('Escolha uma data.', false)
+    window.resumoAgrupado = buildResumoDoDia(d)
+    if (!window.resumoAgrupado || Object.keys(window.resumoAgrupado).length === 0)
+      return log('Sem encomendas pendentes nessa data.')
+    log('Relatório pronto para imprimir.')
+  })
+
+  getEl('imprimirBtn').addEventListener('click', () => {
+    if (!window.resumoAgrupado || Object.keys(window.resumoAgrupado).length === 0)
+      return log('Use o botão Filtrar antes.', false)
+    let txt = "🎄 RELATÓRIO DE ENCOMENDAS PENDENTES — NATAL 2025 🎄\n\n"
+    for (const local in window.resumoAgrupado) {
+      txt += `📍 ${local.toUpperCase()}\n`
+      window.resumoAgrupado[local].forEach(i => {
+        txt += `${i.hora} - ${i.quantidade} ${i.produto}\n`
+      })
+      txt += "\n"
+    }
+    const w = window.open('', '_blank')
+    w.document.write(`<pre style="font-size:16px;font-family:monospace;white-space:pre-wrap;">${txt}</pre>`)
+    w.document.close()
+    w.focus()
+    w.print()
+  })
+
+  async function carregarPedidos() {
+    const snap = await getDocs(collection(db, "pedidos"))
+    encomendas = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+    renderTabela()
+    renderEntregues()
+  }
+
+  carregarPedidos()
+  renderCarrinho()
+})
