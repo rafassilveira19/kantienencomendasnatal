@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js"
-import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, updateDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js"
+import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js"
 
 const firebaseConfig = {
   apiKey: "AIzaSyD--EURv-8FVYXXZUlAWq5mDCS-5Fn0W6k",
@@ -17,6 +17,8 @@ const db = getFirestore(app)
 window.addEventListener("DOMContentLoaded", () => {
   let encomendas = []
   let carrinho = []
+  let entregues = []
+
   const tabelaBody = document.querySelector('#tabela tbody')
   const carrinhoBody = document.querySelector('#carrinhoTable tbody')
   const logDiv = document.getElementById('log')
@@ -30,53 +32,50 @@ window.addEventListener("DOMContentLoaded", () => {
     setTimeout(() => logDiv.textContent = '', 2500)
   }
 
- function renderTabela() {
-  tabelaBody.innerHTML = ''
+  function renderTabela() {
+    tabelaBody.innerHTML = ''
+    const pendentes = encomendas
+      .filter(e => !e.entregue)
+      .sort((a, b) => {
+        const da = new Date(a.data)
+        const db = new Date(b.data)
+        if (da.getTime() !== db.getTime()) return da - db
+        return a.hora.localeCompare(b.hora)
+      })
 
-  const pendentes = encomendas
-    .filter(e => !e.entregue)
-    .sort((a, b) => {
-      const da = new Date(a.data)
-      const db = new Date(b.data)
-      if (da.getTime() !== db.getTime()) return da - db
-      return a.hora.localeCompare(b.hora)
+    const grupos = {}
+    pendentes.forEach(e => {
+      if (!grupos[e.data]) grupos[e.data] = []
+      grupos[e.data].push(e)
     })
 
-  const grupos = {}
-  pendentes.forEach(e => {
-    if (!grupos[e.data]) grupos[e.data] = []
-    grupos[e.data].push(e)
-  })
+    for (const data in grupos) {
+      const linhaData = document.createElement('tr')
+      const dataFormatada = new Date(data + "T00:00:00").toLocaleDateString('pt-BR')
+      linhaData.innerHTML = `<td colspan="8" style="background:#ffe4cc;font-weight:bold;">📅 ${dataFormatada}</td>`
+      tabelaBody.appendChild(linhaData)
 
-  for (const data in grupos) {
-    const linhaData = document.createElement('tr')
-    const dataFormatada = new Date(data + "T00:00:00").toLocaleDateString('pt-BR')
-    linhaData.innerHTML = `<td colspan="8" style="background:#ffe4cc;font-weight:bold;">📅 ${dataFormatada}</td>`
-    tabelaBody.appendChild(linhaData)
-
-    grupos[data].forEach(e => {
-      const produtos = e.produtos.map(p => `${p.produto} (${p.quantidade})`).join(', ')
-      const total = e.produtos.reduce((a, p) => a + p.quantidade, 0)
-      const tr = document.createElement('tr')
-      tr.innerHTML = `
-        <td>${e.nome}</td>
-        <td>${new Date(e.data + "T00:00:00").toLocaleDateString('pt-BR')}</td>
-
-        <td>${e.hora || '-'}</td>
-        <td>${e.retirada || '-'}</td>
-        <td>${produtos}</td>
-        <td><b>${total}</b></td>
-        <td>${e.celular}</td>
-        <td>
-          <button class="btn-edit" data-id="${e.id}">✏️</button>
-          <button class="btn-del" data-id="${e.id}">🗑️</button>
-          <button class="btn-ok" data-id="${e.id}" style="background:#228b22;color:#fff;">✅</button>
-        </td>`
-      tabelaBody.appendChild(tr)
-    })
+      grupos[data].forEach(e => {
+        const produtos = e.produtos.map(p => `${p.produto} (${p.quantidade})`).join(', ')
+        const total = e.produtos.reduce((a, p) => a + p.quantidade, 0)
+        const tr = document.createElement('tr')
+        tr.innerHTML = `
+          <td>${e.nome}</td>
+          <td>${new Date(e.data + "T00:00:00").toLocaleDateString('pt-BR')}</td>
+          <td>${e.hora || '-'}</td>
+          <td>${e.retirada || '-'}</td>
+          <td>${produtos}</td>
+          <td><b>${total}</b></td>
+          <td>${e.celular}</td>
+          <td>
+            <button class="btn-edit" data-id="${e.id}">✏️</button>
+            <button class="btn-del" data-id="${e.id}">🗑️</button>
+            <button class="btn-ok" data-id="${e.id}" style="background:#228b22;color:#fff;">✅</button>
+          </td>`
+        tabelaBody.appendChild(tr)
+      })
+    }
   }
-}
-
 
   function renderCarrinho() {
     carrinhoBody.innerHTML = ''
@@ -120,7 +119,6 @@ window.addEventListener("DOMContentLoaded", () => {
     const celular = getEl('celular').value.trim()
     if (!nome || !data || !hora || !retirada || !celular || carrinho.length === 0)
       return log('Preencha tudo.', false)
-
     const pedido = { nome, data, hora, retirada, celular, produtos: [...carrinho], entregue: false }
     await addDoc(collection(db, "pedidos"), pedido)
     carrinho = []
@@ -158,14 +156,14 @@ window.addEventListener("DOMContentLoaded", () => {
     }
 
     if (e.target.classList.contains('btn-ok')) {
-      const ref = doc(db, "pedidos", id)
-      await updateDoc(ref, { entregue: true })
-      const docAtualizado = await getDoc(ref)
-      const atualizado = { id: ref.id, ...docAtualizado.data() }
-      encomendas = encomendas.map(p => p.id === id ? atualizado : p)
-      renderTabela()
-      renderEntregues()
-      log('Marcado como entregue!')
+      try {
+        await updateDoc(doc(db, "pedidos", id), { entregue: true })
+        log("✅ Pedido marcado como entregue!")
+        carregarPedidos()
+      } catch (err) {
+        console.error(err)
+        log("Erro ao marcar como entregue.", false)
+      }
     }
   })
 
@@ -209,29 +207,76 @@ window.addEventListener("DOMContentLoaded", () => {
     log('Relatório pronto para imprimir.')
   })
 
-  getEl('imprimirBtn').addEventListener('click', () => {
-    if (!window.resumoAgrupado || Object.keys(window.resumoAgrupado).length === 0)
-      return log('Use o botão Filtrar antes.', false)
-    let txt = "🎄 RELATÓRIO DE ENCOMENDAS PENDENTES — NATAL 2025 🎄\n\n"
-    for (const local in window.resumoAgrupado) {
-      txt += `📍 ${local.toUpperCase()}\n`
-      window.resumoAgrupado[local].forEach(i => {
-        txt += `${i.hora} - ${i.quantidade} ${i.produto}\n`
+ getEl('imprimirBtn').addEventListener('click', () => {
+  if (!window.resumoAgrupado || Object.keys(window.resumoAgrupado).length === 0)
+    return log('Use o botão Filtrar antes.', false)
+
+  const dataSelecionada = getEl('filtroData').value
+  const dataFormatada = new Date(dataSelecionada + "T00:00:00").toLocaleDateString('pt-BR')
+
+  let txt = `RELATÓRIO Do DIA ${dataFormatada}\n\n`
+
+  for (const local in window.resumoAgrupado) {
+    txt += `📍 ${local.toUpperCase()}\n`
+    window.resumoAgrupado[local].forEach(i => {
+      txt += `${i.hora} - ${i.quantidade} ${i.produto}\n`
+    })
+    txt += "\n"
+  }
+
+  const w = window.open('', '_blank')
+  w.document.write(`<pre style="font-size:16px;font-family:monospace;white-space:pre-wrap;">${txt}</pre>`)
+  w.document.close()
+  w.focus()
+  w.print()
+})
+
+
+  function renderEntregues() {
+    tabelaEntreguesBody.innerHTML = ''
+    const grupos = {}
+    entregues
+      .sort((a, b) => new Date(a.data) - new Date(b.data))
+      .forEach(e => {
+        if (!grupos[e.data]) grupos[e.data] = []
+        grupos[e.data].push(e)
       })
-      txt += "\n"
+
+    for (const data in grupos) {
+      const linhaData = document.createElement('tr')
+      const dataFormatada = new Date(data + "T00:00:00").toLocaleDateString('pt-BR')
+      linhaData.innerHTML = `<td colspan="7" style="background:#e0ffe0;font-weight:bold;">📅 ${dataFormatada}</td>`
+      tabelaEntreguesBody.appendChild(linhaData)
+
+      grupos[data].forEach(e => {
+        const produtos = e.produtos.map(p => `${p.produto} (${p.quantidade})`).join(', ')
+        const total = e.produtos.reduce((a, p) => a + p.quantidade, 0)
+        const tr = document.createElement('tr')
+        tr.innerHTML = `
+          <td>${new Date(e.data + "T00:00:00").toLocaleDateString('pt-BR')}</td>
+          <td>${e.nome}</td>
+          <td>${e.hora || '-'}</td>
+          <td>${e.retirada || '-'}</td>
+          <td>${produtos}</td>
+          <td><b>${total}</b></td>
+          <td>${e.celular}</td>`
+        tabelaEntreguesBody.appendChild(tr)
+      })
     }
-    const w = window.open('', '_blank')
-    w.document.write(`<pre style="font-size:16px;font-family:monospace;white-space:pre-wrap;">${txt}</pre>`)
-    w.document.close()
-    w.focus()
-    w.print()
-  })
+  }
 
   async function carregarPedidos() {
-    const snap = await getDocs(collection(db, "pedidos"))
-    encomendas = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-    renderTabela()
-    renderEntregues()
+    try {
+      const querySnapshot = await getDocs(collection(db, "pedidos"))
+      const todos = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+      encomendas = todos.filter(e => !e.entregue)
+      entregues = todos.filter(e => e.entregue)
+      renderTabela()
+      renderEntregues()
+    } catch (err) {
+      console.error("Erro ao carregar pedidos:", err)
+      log("Erro ao carregar pedidos.", false)
+    }
   }
 
   carregarPedidos()
