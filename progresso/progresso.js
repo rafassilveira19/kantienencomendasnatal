@@ -65,3 +65,29 @@ async function carregarProgresso() {
 }
 
 carregarProgresso();
+
+
+
+const contador = document.getElementById("contador");
+const dataFinal = new Date("2025-12-31T23:59:00").getTime();
+
+function atualizarContagem() {
+  const agora = new Date().getTime();
+  const distancia = dataFinal - agora;
+
+  if (distancia <= 0) {
+    contador.textContent = "🎅 O Natal chegou! 🎄";
+    clearInterval(intervalo);
+    return;
+  }
+
+  const dias = Math.floor(distancia / (1000 * 60 * 60 * 24));
+  const horas = Math.floor((distancia % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+  const minutos = Math.floor((distancia % (1000 * 60 * 60)) / (1000 * 60));
+  const segundos = Math.floor((distancia % (1000 * 60)) / 1000);
+
+  contador.textContent = `⏳ Faltam ${dias} dias, ${horas} horas, ${minutos} minutos e ${segundos} segundos para o fim da campaha.`;
+}
+
+const intervalo = setInterval(atualizarContagem, 1000);
+atualizarContagem();

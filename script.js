@@ -30,17 +30,40 @@ window.addEventListener("DOMContentLoaded", () => {
     setTimeout(() => logDiv.textContent = '', 2500)
   }
 
-  function renderTabela() {
-    tabelaBody.innerHTML = ''
-    encomendas.filter(e => !e.entregue).forEach(e => {
+ function renderTabela() {
+  tabelaBody.innerHTML = ''
+
+  const pendentes = encomendas
+    .filter(e => !e.entregue)
+    .sort((a, b) => {
+      const da = new Date(a.data)
+      const db = new Date(b.data)
+      if (da.getTime() !== db.getTime()) return da - db
+      return a.hora.localeCompare(b.hora)
+    })
+
+  const grupos = {}
+  pendentes.forEach(e => {
+    if (!grupos[e.data]) grupos[e.data] = []
+    grupos[e.data].push(e)
+  })
+
+  for (const data in grupos) {
+    const linhaData = document.createElement('tr')
+    const dataFormatada = new Date(data + "T00:00:00").toLocaleDateString('pt-BR')
+    linhaData.innerHTML = `<td colspan="8" style="background:#ffe4cc;font-weight:bold;">📅 ${dataFormatada}</td>`
+    tabelaBody.appendChild(linhaData)
+
+    grupos[data].forEach(e => {
       const produtos = e.produtos.map(p => `${p.produto} (${p.quantidade})`).join(', ')
       const total = e.produtos.reduce((a, p) => a + p.quantidade, 0)
       const tr = document.createElement('tr')
       tr.innerHTML = `
         <td>${e.nome}</td>
-        <td>${e.data}</td>
-        <td>${e.hora}</td>
-        <td>${e.retirada}</td>
+        <td>${new Date(e.data + "T00:00:00").toLocaleDateString('pt-BR')}</td>
+
+        <td>${e.hora || '-'}</td>
+        <td>${e.retirada || '-'}</td>
         <td>${produtos}</td>
         <td><b>${total}</b></td>
         <td>${e.celular}</td>
@@ -52,34 +75,8 @@ window.addEventListener("DOMContentLoaded", () => {
       tabelaBody.appendChild(tr)
     })
   }
+}
 
-  function renderEntregues() {
-    tabelaEntreguesBody.innerHTML = ''
-    const grupos = {}
-    encomendas.filter(e => e.entregue).forEach(e => {
-      if (!grupos[e.data]) grupos[e.data] = []
-      grupos[e.data].push(e)
-    })
-    for (const data in grupos) {
-      const linha = document.createElement('tr')
-      linha.innerHTML = `<td colspan="7" style="background:#ffe4cc;font-weight:bold;">📅 ${data}</td>`
-      tabelaEntreguesBody.appendChild(linha)
-      grupos[data].forEach(e => {
-        const produtos = e.produtos.map(p => `${p.produto} (${p.quantidade})`).join(', ')
-        const total = e.produtos.reduce((a, p) => a + p.quantidade, 0)
-        const tr = document.createElement('tr')
-        tr.innerHTML = `
-          <td>${e.data}</td>
-          <td>${e.nome}</td>
-          <td>${e.hora}</td>
-          <td>${e.retirada}</td>
-          <td>${produtos}</td>
-          <td><b>${total}</b></td>
-          <td>${e.celular}</td>`
-        tabelaEntreguesBody.appendChild(tr)
-      })
-    }
-  }
 
   function renderCarrinho() {
     carrinhoBody.innerHTML = ''
