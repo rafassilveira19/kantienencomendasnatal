@@ -133,11 +133,31 @@ window.addEventListener("DOMContentLoaded", () => {
     if (!id) return
 
     if (e.target.classList.contains('btn-del')) {
-      if (!confirm('Excluir este pedido?')) return
+  const modal = document.getElementById('confirmModal')
+  const btnConfirm = document.getElementById('confirmDelete')
+  const btnCancel = document.getElementById('cancelDelete')
+
+  modal.style.display = 'flex'
+
+  btnCancel.onclick = () => {
+    modal.style.display = 'none'
+  }
+
+  btnConfirm.onclick = async () => {
+    try {
       await deleteDoc(doc(db, "pedidos", id))
-      log('Pedido excluído.')
+      log('🗑️ Encomenda apagada com sucesso!')
       carregarPedidos()
-      return
+    } catch (err) {
+      console.error(err)
+      log('Erro ao apagar encomenda.', false)
+    }
+    modal.style.display = 'none'
+  }
+
+  return
+
+
     }
 
     if (e.target.classList.contains('btn-edit')) {
