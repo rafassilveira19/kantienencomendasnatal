@@ -24,6 +24,7 @@ async function carregarProgresso() {
 
     let totalGrandes = 0;
     let totalMinis = 0;
+    let totalFatias = 0;
 
     pedidos.forEach(pedido => {
       if (!Array.isArray(pedido.produtos)) return;
@@ -31,6 +32,8 @@ async function carregarProgresso() {
         const nome = prod.produto.trim().toLowerCase();
         if (nome.includes("mini")) {
           totalMinis += prod.quantidade;
+        } else if (nome.includes("fatia")) {
+          totalFatias += prod.quantidade;
         } else {
           totalGrandes += prod.quantidade;
         }
@@ -38,7 +41,8 @@ async function carregarProgresso() {
     });
 
     const minisEquivalentes = Math.floor(totalMinis / 10);
-    const totalEquivalente = totalGrandes + minisEquivalentes;
+    const fatiasEquivalentes = Math.floor(totalFatias / 4);
+    const totalEquivalente = totalGrandes + minisEquivalentes + fatiasEquivalentes;
 
     const meta = 1800;
     const faltam = Math.max(meta - totalEquivalente, 0);
@@ -47,6 +51,7 @@ async function carregarProgresso() {
     div.innerHTML = `
       <p><b>Grandes:</b> ${totalGrandes}</p>
       <p><b>Minis:</b> ${totalMinis} — equivalem a: <b>${minisEquivalentes}</b> grandes</p>
+      <p><b>Fatias Tostadas:</b> ${totalFatias} — equivalem a: <b>${fatiasEquivalentes}</b> grandes</p>
       <hr style="width:60%; margin:20px auto;">
       <p><b>Total equivalentes a grandes:</b> ${totalEquivalente}</p>
 
@@ -67,27 +72,24 @@ async function carregarProgresso() {
 carregarProgresso();
 
 
+const contador = document.getElementById("contadorNatal");
 
-const contador = document.getElementById("contador");
-const dataFinal = new Date("2025-12-31T23:59:00").getTime();
+function atualizarContador() {
+  const destino = new Date("2025-12-31T23:59:00");
+  const agora = new Date();
+  const diff = destino - agora;
 
-function atualizarContagem() {
-  const agora = new Date().getTime();
-  const distancia = dataFinal - agora;
-
-  if (distancia <= 0) {
-    contador.textContent = "🎅 O Natal chegou! 🎄";
-    clearInterval(intervalo);
+  if (diff <= 0) {
+    contador.textContent = "🎉 Chegamos ao grande dia! 🎄";
     return;
   }
 
-  const dias = Math.floor(distancia / (1000 * 60 * 60 * 24));
-  const horas = Math.floor((distancia % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-  const minutos = Math.floor((distancia % (1000 * 60 * 60)) / (1000 * 60));
-  const segundos = Math.floor((distancia % (1000 * 60)) / 1000);
+  const dias = Math.floor(diff / (1000 * 60 * 60 * 24));
+  const horas = Math.floor((diff / (1000 * 60 * 60)) % 24);
+  const minutos = Math.floor((diff / (1000 * 60)) % 60);
+  const segundos = Math.floor((diff / 1000) % 60);
 
-  contador.textContent = `⏳ Faltam ${dias} dias, ${horas} horas, ${minutos} minutos e ${segundos} segundos para o fim da campaha.`;
+  contador.textContent = `⏳ Ainda temos ${dias} dias, ${horas}h ${minutos}m ${segundos}s para bater nossa meta.`;
 }
 
-const intervalo = setInterval(atualizarContagem, 1000);
-atualizarContagem();
+setInterval(atualizarContador, 1000);

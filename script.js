@@ -78,17 +78,33 @@ window.addEventListener("DOMContentLoaded", () => {
   }
 
   function renderCarrinho() {
-    carrinhoBody.innerHTML = ''
-    if (carrinho.length === 0) {
-      carrinhoBody.innerHTML = `<tr><td colspan="3" style="color:#999;">Nenhum produto adicionado</td></tr>`
-      return
-    }
-    carrinho.forEach((p, i) => {
-      carrinhoBody.innerHTML += `
-        <tr><td>${p.produto}</td><td>${p.quantidade}</td>
-        <td><button type="button" data-i="${i}">🗑️</button></td></tr>`
-    })
+  carrinhoBody.innerHTML = ''
+  if (carrinho.length === 0) {
+    carrinhoBody.innerHTML = `<tr><td colspan="3" style="color:#999;">Nenhum produto adicionado</td></tr>`
+    return
   }
+
+  let totalFatias = 0
+
+  carrinho.forEach((p, i) => {
+    if (p.produto.toLowerCase().includes('fatia')) totalFatias += p.quantidade
+    carrinhoBody.innerHTML += `
+      <tr>
+        <td>${p.produto}</td>
+        <td>${p.quantidade}</td>
+        <td><button type="button" data-i="${i}">🗑️</button></td>
+      </tr>`
+  })
+
+  if (totalFatias >= 4) {
+    const equivalentes = Math.floor(totalFatias / 4)
+    carrinhoBody.innerHTML += `
+      <tr style="background:#fef4e8;">
+        <td colspan="3"><b>🍫 ${totalFatias} fatias = ${equivalentes} chocotone(s) grande(s)</b></td>
+      </tr>`
+  }
+}
+
 
   carrinhoBody.addEventListener('click', e => {
     const i = e.target?.dataset?.i
@@ -119,6 +135,19 @@ window.addEventListener("DOMContentLoaded", () => {
     const celular = getEl('celular').value.trim()
     if (!nome || !data || !hora || !retirada || !celular || carrinho.length === 0)
       return log('Preencha tudo.', false)
+
+    let totalFatias = carrinho
+  .filter(p => p.produto.toLowerCase().includes('fatia'))
+  .reduce((a, b) => a + b.quantidade, 0)
+
+if (totalFatias >= 4) {
+  const equivalentes = Math.floor(totalFatias / 4)
+  carrinho.push({
+    produto: `Chocotone grande (equivalente a ${equivalentes * 4} fatias)`,
+    quantidade: equivalentes
+  })
+}
+
     const pedido = { nome, data, hora, retirada, celular, produtos: [...carrinho], entregue: false }
     await addDoc(collection(db, "pedidos"), pedido)
     carrinho = []
