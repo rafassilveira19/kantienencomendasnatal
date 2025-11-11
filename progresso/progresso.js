@@ -53,8 +53,9 @@ async function carregarProgresso() {
       <p><b>Minis:</b> ${totalMinis} — equivalem a: <b>${minisEquivalentes}</b> grandes</p>
       <p><b>Fatias Tostadas:</b> ${totalFatias} — equivalem a: <b>${fatiasEquivalentes}</b> grandes</p>
       <hr style="width:60%; margin:20px auto;">
-      <p><b>Total equivalentes a grandes:</b> ${totalEquivalente}</p>
-
+  
+    <span style="font-size: 26px; color: #333;"<b>Total vendidos até agora: <b>${totalEquivalente}</b></span>
+  
       <div class="barra">
         <div class="preenchido" style="width:${porcentagem}%;">${porcentagem}%</div>
       </div>
