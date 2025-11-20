@@ -114,18 +114,42 @@ window.addEventListener("DOMContentLoaded", () => {
   })
 
   getEl('produto').addEventListener('change', () => {
-    getEl('outroProduto').style.display = getEl('produto').value === 'outro' ? 'inline-block' : 'none'
-  })
+  const valor = getEl('produto').value
+
+  getEl('outroProduto').style.display = valor === 'outro' ? 'inline-block' : 'none'
+  getEl('saborTorre').style.display = valor === 'torre' ? 'inline-block' : 'none'
+})
+
 
   getEl('addBtn').addEventListener('click', () => {
-    const produto = getEl('produto').value === 'outro' ? getEl('outroProduto').value.trim() : getEl('produto').value
-    const qtd = parseInt(getEl('quantidade').value)
-    if (!produto || !qtd || qtd <= 0) return log('Preencha produto e quantidade.', false)
-    carrinho.push({ produto, quantidade: qtd })
-    renderCarrinho()
-    getEl('produtoForm').reset()
-    getEl('outroProduto').style.display = 'none'
-  })
+  const selectValor = getEl('produto').value
+  const qtd = parseInt(getEl('quantidade').value)
+
+  if (!selectValor || !qtd || qtd <= 0) {
+    return log('Preencha produto e quantidade.', false)
+  }
+
+  let produtoFinal = ''
+
+  if (selectValor === 'outro') {
+    const outro = getEl('outroProduto').value.trim()
+    if (!outro) return log('Digite o nome do produto.', false)
+    produtoFinal = outro
+  } else if (selectValor === 'torre') {
+    const sabor = getEl('saborTorre').value.trim()
+    if (!sabor) return log('Informe o sabor da Torre de Macarons.', false)
+    produtoFinal = `Torre de Macarons - ${sabor}`
+  } else {
+    produtoFinal = selectValor
+  }
+
+  carrinho.push({ produto: produtoFinal, quantidade: qtd })
+  renderCarrinho()
+  getEl('produtoForm').reset()
+  getEl('outroProduto').style.display = 'none'
+  getEl('saborTorre').style.display = 'none'
+})
+  
 
   getEl('finalizarBtn').addEventListener('click', async () => {
     const nome = getEl('nome').value.trim()

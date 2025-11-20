@@ -28,15 +28,30 @@ async function carregarProgresso() {
 
     pedidos.forEach(pedido => {
       if (!Array.isArray(pedido.produtos)) return;
+
       pedido.produtos.forEach(prod => {
-        const nome = prod.produto.trim().toLowerCase();
-        if (nome.includes("mini")) {
-          totalMinis += prod.quantidade;
-        } else if (nome.includes("fatia")) {
-          totalFatias += prod.quantidade;
-        } else {
-          totalGrandes += prod.quantidade;
+        const nome = String(prod.produto || "").trim().toLowerCase();
+        const qtd = Number(prod.quantidade) || 0;
+
+      
+        const ehMini = nome.startsWith("mini chocotone");
+
+       
+        const ehFatia = nome.includes("fatia") && !nome.includes("bites");
+
+        
+        const ehChocotone = nome.startsWith("chocotone");
+        const ehBites = nome.includes("bites");
+        const ehGrande = ehChocotone && !ehMini && !ehBites;
+
+        if (ehMini) {
+          totalMinis += qtd;
+        } else if (ehFatia) {
+          totalFatias += qtd;
+        } else if (ehGrande) {
+          totalGrandes += qtd;
         }
+      
       });
     });
 
@@ -51,11 +66,13 @@ async function carregarProgresso() {
     div.innerHTML = `
       <p><b>Grandes:</b> ${totalGrandes}</p>
       <p><b>Minis:</b> ${totalMinis} — equivalem a: <b>${minisEquivalentes}</b> grandes</p>
-      <p><b>Fatias Tostadas:</b> ${totalFatias} — equivalem a: <b>${fatiasEquivalentes}</b> grandes</p>
+      <p><b>Fatias:</b> ${totalFatias} — equivalem a: <b>${fatiasEquivalentes}</b> grandes</p>
       <hr style="width:60%; margin:20px auto;">
-  
-    <span style="font-size: 26px; color: #333;"<b>Total vendidos até agora: <b>${totalEquivalente}</b></span>
-  
+
+      <span style="font-size: 26px; color: #333;">
+        <b>Total vendidos até agora: ${totalEquivalente}</b>
+      </span>
+
       <div class="barra">
         <div class="preenchido" style="width:${porcentagem}%;">${porcentagem}%</div>
       </div>
@@ -71,7 +88,6 @@ async function carregarProgresso() {
 }
 
 carregarProgresso();
-
 
 const contador = document.getElementById("contadorNatal");
 
